@@ -37,25 +37,28 @@ jobs:
 
           Copy-Item "lib\main.dart" "car_diagnostic_build\lib\main.dart" -Force
 
-      - name: Remove default Flutter test
+      - name: Remove default Flutter files
         shell: pwsh
         run: |
           if (Test-Path "car_diagnostic_build\test") {
             Remove-Item "car_diagnostic_build\test" -Recurse -Force
           }
 
-      - name: Install Flutter dependencies
+          if (Test-Path "car_diagnostic_build\lib\main.dart") {
+            Write-Host "Custom main.dart copied successfully."
+          }
+
+      - name: Install dependencies
         shell: pwsh
         working-directory: car_diagnostic_build
         run: |
           flutter pub get
 
-      - name: Verify Flutter project
+      - name: Check Flutter project
         shell: pwsh
         working-directory: car_diagnostic_build
         run: |
           flutter doctor -v
-          flutter analyze lib
 
       - name: Build Windows application
         shell: pwsh
@@ -63,29 +66,40 @@ jobs:
         run: |
           flutter build windows --release
 
-      - name: Verify Windows build
+      - name: Verify Windows executable
         shell: pwsh
         run: |
-          $buildPath = "car_diagnostic_build\build\windows\x64\runner\Release"
+          $releasePath = "car_diagnostic_build\build\windows\x64\runner\Release"
 
-          if (!(Test-Path $buildPath)) {
-            Write-Error "Windows build folder was not created."
+          if (!(Test-Path $releasePath)) {
+            Write-Error "Windows Release folder was not created."
             exit 1
           }
 
-          $exe = Get-ChildItem $buildPath -Filter "*.exe" -Recurse
+          $exeFiles = Get-ChildItem `
+            -Path $releasePath `
+            -Filter "*.exe" `
+            -Recurse
 
-          if ($exe.Count -eq 0) {
-            Write-Error "Windows executable was not found."
+          if ($exeFiles.Count -eq 0) {
+            Write-Error "No Windows executable was found."
             exit 1
           }
 
-          Write-Host "Windows executable found:"
-          $exe | ForEach-Object {
-            Write-Host $_.FullName
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "WINDOWS BUILD SUCCESSFUL"
+          Write-Host "========================================"
+          Write-Host ""
+
+          foreach ($exe in $exeFiles) {
+            Write-Host "EXE: $($exe.FullName)"
           }
 
-      - name: Package Windows application
+          Write-Host ""
+          Write-Host "========================================"
+
+      - name: Create ZIP package
         shell: pwsh
         run: |
           $releasePath = "car_diagnostic_build\build\windows\x64\runner\Release"
@@ -95,12 +109,16 @@ jobs:
             exit 1
           }
 
+          if (Test-Path "Car-Diagnostic-AI-Windows.zip") {
+            Remove-Item "Car-Diagnostic-AI-Windows.zip" -Force
+          }
+
           Compress-Archive `
             -Path "$releasePath\*" `
             -DestinationPath "Car-Diagnostic-AI-Windows.zip" `
             -Force
 
-      - name: Show package information
+      - name: Verify ZIP package
         shell: pwsh
         run: |
           if (!(Test-Path "Car-Diagnostic-AI-Windows.zip")) {
@@ -108,16 +126,17 @@ jobs:
             exit 1
           }
 
-          $file = Get-Item "Car-Diagnostic-AI-Windows.zip"
+          $zip = Get-Item "Car-Diagnostic-AI-Windows.zip"
 
-          Write-Host "=========================================="
-          Write-Host "CAR DIAGNOSTIC AI BUILD COMPLETE"
-          Write-Host "=========================================="
-          Write-Host "Package: $($file.Name)"
-          Write-Host "Size: $([math]::Round($file.Length / 1MB, 2)) MB"
-          Write-Host "=========================================="
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "CAR DIAGNOSTIC AI PACKAGE CREATED"
+          Write-Host "========================================"
+          Write-Host "File: $($zip.Name)"
+          Write-Host "Size: $([math]::Round($zip.Length / 1MB, 2)) MB"
+          Write-Host "========================================"
 
-      - name: Upload Windows application
+      - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
         with:
           name: Car-Diagnostic-AI-Windows

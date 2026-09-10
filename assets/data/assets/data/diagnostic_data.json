@@ -1,0 +1,86 @@
+{
+  "dtc": [
+    {
+      "code": "P0300",
+      "name": "Random/Multiple Cylinder Misfire",
+      "causes": [
+        "Świece zapłonowe",
+        "Cewki zapłonowe",
+        "Wtryskiwacze",
+        "Nieszczelność dolotu",
+        "Problem z paliwem"
+      ],
+      "checks": [
+        "Sprawdź świece",
+        "Sprawdź cewki",
+        "Sprawdź korekty paliwowe",
+        "Sprawdź szczelność dolotu"
+      ]
+    },
+    {
+      "code": "P0301",
+      "name": "Cylinder 1 Misfire",
+      "causes": [
+        "Świeca cylindra 1",
+        "Cewka cylindra 1",
+        "Wtryskiwacz",
+        "Niska kompresja"
+      ],
+      "checks": [
+        "Zamień cewkę cylindra 1 z innym cylindrem",
+        "Sprawdź świecę",
+        "Sprawdź wtryskiwacz",
+        "Zmierz kompresję"
+      ]
+    },
+    {
+      "code": "P0401",
+      "name": "EGR Insufficient Flow",
+      "causes": [
+        "Zabrudzony EGR",
+        "Zablokowany zawór EGR",
+        "Problem z podciśnieniem",
+        "Problem z przewodami"
+      ],
+      "checks": [
+        "Sprawdź EGR",
+        "Sprawdź przewody",
+        "Sprawdź sterowanie EGR",
+        "Sprawdź wartości rzeczywiste"
+      ]
+    },
+    {
+      "code": "P0101",
+      "name": "Mass Air Flow Sensor Range/Performance",
+      "causes": [
+        "Uszkodzony MAF",
+        "Zabrudzony MAF",
+        "Nieszczelność dolotu",
+        "Problem z filtrem powietrza"
+      ],
+      "checks": [
+        "Sprawdź MAF",
+        "Sprawdź filtr powietrza",
+        "Sprawdź szczelność dolotu",
+        "Porównaj wartości zadane i rzeczywiste"
+      ]
+    },
+    {
+      "code": "P0299",
+      "name": "Turbocharger Underboost",
+      "causes": [
+        "Nieszczelność dolotu",
+        "Problem z podciśnieniem",
+        "Sterowanie turbo",
+        "Zawór EGR",
+        "Problem z turbosprężarką"
+      ],
+      "checks": [
+        "Sprawdź przewody dolotowe",
+        "Sprawdź podciśnienie",
+        "Sprawdź sterowanie turbo",
+        "Porównaj ciśnienie zadane i rzeczywiste"
+      ]
+    }
+  ]
+}

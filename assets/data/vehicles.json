@@ -1,0 +1,222 @@
+{
+  "vehicles": [
+    {
+      "make": "BMW",
+      "model": "3 Series",
+      "generation": "E90/E91/E92/E93",
+      "years": "2005-2013",
+      "engines": [
+        {
+          "name": "320d",
+          "code": "M47N2",
+          "fuel": "Diesel",
+          "power_hp": 163
+        },
+        {
+          "name": "320d",
+          "code": "N47",
+          "fuel": "Diesel",
+          "power_hp": 177
+        },
+        {
+          "name": "320i",
+          "code": "N46",
+          "fuel": "Petrol",
+          "power_hp": 150
+        }
+      ]
+    },
+    {
+      "make": "BMW",
+      "model": "5 Series",
+      "generation": "E60/E61",
+      "years": "2003-2010",
+      "engines": [
+        {
+          "name": "520d",
+          "code": "M47N2",
+          "fuel": "Diesel",
+          "power_hp": 163
+        },
+        {
+          "name": "530d",
+          "code": "M57",
+          "fuel": "Diesel",
+          "power_hp": 218
+        }
+      ]
+    },
+    {
+      "make": "Audi",
+      "model": "A4",
+      "generation": "B8",
+      "years": "2007-2015",
+      "engines": [
+        {
+          "name": "2.0 TDI",
+          "code": "CAGA",
+          "fuel": "Diesel",
+          "power_hp": 143
+        },
+        {
+          "name": "2.0 TDI",
+          "code": "CAHA",
+          "fuel": "Diesel",
+          "power_hp": 170
+        },
+        {
+          "name": "2.0 TFSI",
+          "code": "CDNC",
+          "fuel": "Petrol",
+          "power_hp": 180
+        }
+      ]
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Golf",
+      "generation": "VII",
+      "years": "2012-2019",
+      "engines": [
+        {
+          "name": "1.6 TDI",
+          "code": "CLHA",
+          "fuel": "Diesel",
+          "power_hp": 105
+        },
+        {
+          "name": "2.0 TDI",
+          "code": "CRBC",
+          "fuel": "Diesel",
+          "power_hp": 150
+        },
+        {
+          "name": "1.4 TSI",
+          "code": "CZCA",
+          "fuel": "Petrol",
+          "power_hp": 125
+        }
+      ]
+    },
+    {
+      "make": "Volkswagen",
+      "model": "Passat",
+      "generation": "B8",
+      "years": "2014-2023",
+      "engines": [
+        {
+          "name": "1.6 TDI",
+          "code": "DCXA",
+          "fuel": "Diesel",
+          "power_hp": 120
+        },
+        {
+          "name": "2.0 TDI",
+          "code": "DFGA",
+          "fuel": "Diesel",
+          "power_hp": 150
+        }
+      ]
+    },
+    {
+      "make": "Mercedes-Benz",
+      "model": "C-Class",
+      "generation": "W204",
+      "years": "2007-2014",
+      "engines": [
+        {
+          "name": "C200 CDI",
+          "code": "OM651",
+          "fuel": "Diesel",
+          "power_hp": 136
+        },
+        {
+          "name": "C220 CDI",
+          "code": "OM651",
+          "fuel": "Diesel",
+          "power_hp": 170
+        }
+      ]
+    },
+    {
+      "make": "Ford",
+      "model": "Focus",
+      "generation": "Mk3",
+      "years": "2010-2018",
+      "engines": [
+        {
+          "name": "1.6 TDCi",
+          "code": "DV6",
+          "fuel": "Diesel",
+          "power_hp": 115
+        },
+        {
+          "name": "2.0 TDCi",
+          "code": "T7DA",
+          "fuel": "Diesel",
+          "power_hp": 150
+        }
+      ]
+    },
+    {
+      "make": "Opel",
+      "model": "Astra",
+      "generation": "J",
+      "years": "2009-2015",
+      "engines": [
+        {
+          "name": "1.7 CDTI",
+          "code": "A17DTR",
+          "fuel": "Diesel",
+          "power_hp": 125
+        },
+        {
+          "name": "2.0 CDTI",
+          "code": "A20DTH",
+          "fuel": "Diesel",
+          "power_hp": 160
+        }
+      ]
+    },
+    {
+      "make": "Škoda",
+      "model": "Octavia",
+      "generation": "III",
+      "years": "2013-2020",
+      "engines": [
+        {
+          "name": "1.6 TDI",
+          "code": "CLHA",
+          "fuel": "Diesel",
+          "power_hp": 105
+        },
+        {
+          "name": "2.0 TDI",
+          "code": "CRMB",
+          "fuel": "Diesel",
+          "power_hp": 150
+        }
+      ]
+    },
+    {
+      "make": "Toyota",
+      "model": "Corolla",
+      "generation": "E210",
+      "years": "2018-2026",
+      "engines": [
+        {
+          "name": "1.8 Hybrid",
+          "code": "2ZR-FXE",
+          "fuel": "Hybrid",
+          "power_hp": 122
+        },
+        {
+          "name": "2.0 Hybrid",
+          "code": "M20A-FXS",
+          "fuel": "Hybrid",
+          "power_hp": 180
+        }
+      ]
+    }
+  ]
+}

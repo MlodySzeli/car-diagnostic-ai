@@ -175,13 +175,15 @@ class _MainPageState extends State<MainPage> {
 
               if (mounted) {
                 Navigator.pop(context);
-                await loadBrands();
+              await _jakasFunkcja();
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Dodano markę: $name'),
-                  ),
-                );
+if (!mounted) return;
+
+ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+    content: Text('Operacja zakończona pomyślnie'),
+  ),
+);
               }
             },
             child: const Text('ZAPISZ'),

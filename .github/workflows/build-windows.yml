@@ -34,6 +34,10 @@ jobs:
           channel: stable
 
 
+      # ============================
+      # SHOW FLUTTER VERSION
+      # ============================
+
       - name: Show Flutter version
         shell: pwsh
 
@@ -53,67 +57,59 @@ jobs:
 
 
       # ============================
-      # COPY PROJECT FILES
+      # COPY PUBSPEC
       # ============================
 
-      - name: Copy application files
+      - name: Copy pubspec.yaml
         shell: pwsh
 
         run: |
-
-          # PUBSPEC
-
           Copy-Item `
             "pubspec.yaml" `
             "car_diagnostic_build\pubspec.yaml" `
             -Force
 
 
-          # LIB FOLDER
+      # ============================
+      # COPY ENTIRE LIB FOLDER
+      # ============================
 
-          New-Item `
-            -ItemType Directory `
-            -Force `
+      - name: Copy application source files
+        shell: pwsh
+
+        run: |
+          if (Test-Path "car_diagnostic_build\lib") {
+            Remove-Item `
+              "car_diagnostic_build\lib" `
+              -Recurse `
+              -Force
+          }
+
+          Copy-Item `
+            "lib" `
             "car_diagnostic_build\lib" `
-            | Out-Null
-
-
-          Copy-Item `
-            "lib\main.dart" `
-            "car_diagnostic_build\lib\main.dart" `
+            -Recurse `
             -Force
 
 
-          Copy-Item `
-            "lib\models.dart" `
-            "car_diagnostic_build\lib\models.dart" `
-            -Force
+      # ============================
+      # COPY ASSETS
+      # ============================
 
+      - name: Copy application assets
+        shell: pwsh
 
-          Copy-Item `
-            "lib\database.dart" `
-            "car_diagnostic_build\lib\database.dart" `
-            -Force
-
-
-          # ASSETS
-
+        run: |
           New-Item `
             -ItemType Directory `
             -Force `
-            "car_diagnostic_build\assets\data" `
+            "car_diagnostic_build\assets" `
             | Out-Null
 
-
           Copy-Item `
-            "assets\data\vehicles.json" `
-            "car_diagnostic_build\assets\data\vehicles.json" `
-            -Force
-
-
-          Copy-Item `
-            "assets\data\diagnostic_data.json" `
-            "car_diagnostic_build\assets\data\diagnostic_data.json" `
+            "assets\data" `
+            "car_diagnostic_build\assets\data" `
+            -Recurse `
             -Force
 
 
@@ -125,11 +121,9 @@ jobs:
         shell: pwsh
 
         run: |
-
           Write-Host ""
           Write-Host "Checking application files..."
           Write-Host ""
-
 
           $files = @(
 
@@ -141,12 +135,15 @@ jobs:
 
             "car_diagnostic_build\lib\database.dart",
 
+            "car_diagnostic_build\lib\services\dtc_service.dart",
+
+            "car_diagnostic_build\lib\services\internet_service.dart",
+
             "car_diagnostic_build\assets\data\vehicles.json",
 
             "car_diagnostic_build\assets\data\diagnostic_data.json"
 
           )
-
 
           foreach ($file in $files) {
 
@@ -158,11 +155,9 @@ jobs:
 
             }
 
-
             Write-Host "FOUND: $file"
 
           }
-
 
           Write-Host ""
           Write-Host "All application files found successfully."
@@ -176,7 +171,6 @@ jobs:
         shell: pwsh
 
         run: |
-
           if (Test-Path "car_diagnostic_build\test") {
 
             Remove-Item `
@@ -197,7 +191,6 @@ jobs:
         working-directory: car_diagnostic_build
 
         run: |
-
           flutter pub get
 
 
@@ -211,7 +204,6 @@ jobs:
         working-directory: car_diagnostic_build
 
         run: |
-
           flutter analyze
 
 
@@ -225,7 +217,6 @@ jobs:
         working-directory: car_diagnostic_build
 
         run: |
-
           flutter build windows --release
 
 
@@ -237,10 +228,8 @@ jobs:
         shell: pwsh
 
         run: |
-
           $releasePath = `
             "car_diagnostic_build\build\windows\x64\runner\Release"
-
 
           if (!(Test-Path $releasePath)) {
 
@@ -251,12 +240,10 @@ jobs:
 
           }
 
-
           $exeFiles = Get-ChildItem `
             -Path $releasePath `
             -Filter "*.exe" `
             -Recurse
-
 
           if ($exeFiles.Count -eq 0) {
 
@@ -267,7 +254,6 @@ jobs:
 
           }
 
-
           Write-Host ""
 
           Write-Host "========================================"
@@ -276,13 +262,11 @@ jobs:
 
           Write-Host "========================================"
 
-
           foreach ($exe in $exeFiles) {
 
             Write-Host "EXE: $($exe.FullName)"
 
           }
-
 
           Write-Host "========================================"
 
@@ -295,10 +279,8 @@ jobs:
         shell: pwsh
 
         run: |
-
           $releasePath = `
             "car_diagnostic_build\build\windows\x64\runner\Release"
-
 
           if (!(Test-Path $releasePath)) {
 
@@ -309,7 +291,6 @@ jobs:
 
           }
 
-
           if (Test-Path "Car-Diagnostic-AI-Windows.zip") {
 
             Remove-Item `
@@ -317,7 +298,6 @@ jobs:
               -Force
 
           }
-
 
           Compress-Archive `
             -Path "$releasePath\*" `
@@ -333,7 +313,6 @@ jobs:
         shell: pwsh
 
         run: |
-
           if (!(Test-Path "Car-Diagnostic-AI-Windows.zip")) {
 
             Write-Error `
@@ -343,10 +322,8 @@ jobs:
 
           }
 
-
           $zip = Get-Item `
             "Car-Diagnostic-AI-Windows.zip"
-
 
           Write-Host ""
 

@@ -7,103 +7,143 @@ on:
 
   workflow_dispatch:
 
-
 jobs:
-
   build-windows:
-
     name: Build Windows application
 
     runs-on: windows-latest
 
-
     steps:
 
-
       # ============================
-      # CHECKOUT
+      # CHECKOUT REPOSITORY
       # ============================
 
       - name: Checkout repository
-
         uses: actions/checkout@v4
 
 
       # ============================
-      # FLUTTER
+      # INSTALL FLUTTER
       # ============================
 
       - name: Install Flutter
-
         uses: subosito/flutter-action@v2
 
         with:
-
           channel: stable
 
 
       - name: Show Flutter version
-
-        run: flutter --version
-
-
-      # ============================
-      # ENABLE WINDOWS
-      # ============================
-
-      - name: Enable Windows desktop
-
         shell: pwsh
 
         run: |
-
-          flutter config --enable-windows-desktop
+          flutter --version
 
 
       # ============================
       # CREATE WINDOWS PROJECT
       # ============================
 
-      - name: Create Windows platform
+      - name: Create Flutter Windows project
+        shell: pwsh
 
+        run: |
+          flutter create --platforms=windows car_diagnostic_build
+
+
+      # ============================
+      # COPY PROJECT FILES
+      # ============================
+
+      - name: Copy application files
         shell: pwsh
 
         run: |
 
-          if (!(Test-Path "windows")) {
+          # PUBSPEC
 
-            flutter create --platforms=windows .
+          Copy-Item `
+            "pubspec.yaml" `
+            "car_diagnostic_build\pubspec.yaml" `
+            -Force
 
-          }
+
+          # LIB FOLDER
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            "car_diagnostic_build\lib" `
+            | Out-Null
+
+
+          Copy-Item `
+            "lib\main.dart" `
+            "car_diagnostic_build\lib\main.dart" `
+            -Force
+
+
+          Copy-Item `
+            "lib\models.dart" `
+            "car_diagnostic_build\lib\models.dart" `
+            -Force
+
+
+          Copy-Item `
+            "lib\database.dart" `
+            "car_diagnostic_build\lib\database.dart" `
+            -Force
+
+
+          # ASSETS
+
+          New-Item `
+            -ItemType Directory `
+            -Force `
+            "car_diagnostic_build\assets\data" `
+            | Out-Null
+
+
+          Copy-Item `
+            "assets\data\vehicles.json" `
+            "car_diagnostic_build\assets\data\vehicles.json" `
+            -Force
+
+
+          Copy-Item `
+            "assets\data\diagnostic_data.json" `
+            "car_diagnostic_build\assets\data\diagnostic_data.json" `
+            -Force
 
 
       # ============================
       # VERIFY FILES
       # ============================
 
-      - name: Verify project files
-
+      - name: Verify application files
         shell: pwsh
 
         run: |
 
           Write-Host ""
+          Write-Host "Checking application files..."
+          Write-Host ""
 
-          Write-Host "Checking project files..."
 
           $files = @(
 
-            "lib\main.dart",
+            "car_diagnostic_build\pubspec.yaml",
 
-            "lib\models.dart",
+            "car_diagnostic_build\lib\main.dart",
 
-            "lib\database.dart",
+            "car_diagnostic_build\lib\models.dart",
 
-            "assets\data\vehicles.json",
+            "car_diagnostic_build\lib\database.dart",
 
-            "assets\data\diagnostic_data.json",
+            "car_diagnostic_build\assets\data\vehicles.json",
 
-            "pubspec.yaml"
+            "car_diagnostic_build\assets\data\diagnostic_data.json"
 
           )
 
@@ -118,23 +158,43 @@ jobs:
 
             }
 
+
             Write-Host "FOUND: $file"
 
           }
 
 
           Write-Host ""
-
-          Write-Host "All required files found."
+          Write-Host "All application files found successfully."
 
 
       # ============================
-      # GET DEPENDENCIES
+      # REMOVE DEFAULT TEST
+      # ============================
+
+      - name: Remove default Flutter test
+        shell: pwsh
+
+        run: |
+
+          if (Test-Path "car_diagnostic_build\test") {
+
+            Remove-Item `
+              "car_diagnostic_build\test" `
+              -Recurse `
+              -Force
+
+          }
+
+
+      # ============================
+      # INSTALL DEPENDENCIES
       # ============================
 
       - name: Install dependencies
-
         shell: pwsh
+
+        working-directory: car_diagnostic_build
 
         run: |
 
@@ -142,12 +202,13 @@ jobs:
 
 
       # ============================
-      # ANALYZE
+      # ANALYZE PROJECT
       # ============================
 
-      - name: Analyze project
-
+      - name: Analyze Flutter project
         shell: pwsh
+
+        working-directory: car_diagnostic_build
 
         run: |
 
@@ -155,12 +216,13 @@ jobs:
 
 
       # ============================
-      # BUILD
+      # BUILD WINDOWS
       # ============================
 
       - name: Build Windows application
-
         shell: pwsh
+
+        working-directory: car_diagnostic_build
 
         run: |
 
@@ -168,21 +230,22 @@ jobs:
 
 
       # ============================
-      # VERIFY BUILD
+      # VERIFY EXECUTABLE
       # ============================
 
       - name: Verify Windows executable
-
         shell: pwsh
 
         run: |
 
-          $releasePath = "build\windows\x64\runner\Release"
+          $releasePath = `
+            "car_diagnostic_build\build\windows\x64\runner\Release"
 
 
           if (!(Test-Path $releasePath)) {
 
-            Write-Error "Release folder was not created."
+            Write-Error `
+              "Windows Release folder was not created."
 
             exit 1
 
@@ -190,17 +253,15 @@ jobs:
 
 
           $exeFiles = Get-ChildItem `
-
             -Path $releasePath `
-
             -Filter "*.exe" `
-
             -Recurse
 
 
           if ($exeFiles.Count -eq 0) {
 
-            Write-Error "No Windows executable found."
+            Write-Error `
+              "No Windows executable was found."
 
             exit 1
 
@@ -209,11 +270,11 @@ jobs:
 
           Write-Host ""
 
-          Write-Host "======================================"
+          Write-Host "========================================"
 
           Write-Host "WINDOWS BUILD SUCCESSFUL"
 
-          Write-Host "======================================"
+          Write-Host "========================================"
 
 
           foreach ($exe in $exeFiles) {
@@ -223,7 +284,7 @@ jobs:
           }
 
 
-          Write-Host "======================================"
+          Write-Host "========================================"
 
 
       # ============================
@@ -231,17 +292,18 @@ jobs:
       # ============================
 
       - name: Create ZIP package
-
         shell: pwsh
 
         run: |
 
-          $releasePath = "build\windows\x64\runner\Release"
+          $releasePath = `
+            "car_diagnostic_build\build\windows\x64\runner\Release"
 
 
           if (!(Test-Path $releasePath)) {
 
-            Write-Error "Release folder not found."
+            Write-Error `
+              "Release folder does not exist."
 
             exit 1
 
@@ -251,29 +313,62 @@ jobs:
           if (Test-Path "Car-Diagnostic-AI-Windows.zip") {
 
             Remove-Item `
-
               "Car-Diagnostic-AI-Windows.zip" `
-
               -Force
 
           }
 
 
           Compress-Archive `
-
             -Path "$releasePath\*" `
-
             -DestinationPath "Car-Diagnostic-AI-Windows.zip" `
-
             -Force
 
 
       # ============================
-      # UPLOAD
+      # VERIFY ZIP
       # ============================
 
-      - name: Upload Windows application
+      - name: Verify ZIP package
+        shell: pwsh
 
+        run: |
+
+          if (!(Test-Path "Car-Diagnostic-AI-Windows.zip")) {
+
+            Write-Error `
+              "ZIP package was not created."
+
+            exit 1
+
+          }
+
+
+          $zip = Get-Item `
+            "Car-Diagnostic-AI-Windows.zip"
+
+
+          Write-Host ""
+
+          Write-Host "========================================"
+
+          Write-Host "PACKAGE CREATED"
+
+          Write-Host "========================================"
+
+          Write-Host "File: $($zip.Name)"
+
+          Write-Host `
+            "Size: $([math]::Round($zip.Length / 1MB, 2)) MB"
+
+          Write-Host "========================================"
+
+
+      # ============================
+      # UPLOAD ARTIFACT
+      # ============================
+
+      - name: Upload Windows ZIP
         uses: actions/upload-artifact@v4
 
         with:

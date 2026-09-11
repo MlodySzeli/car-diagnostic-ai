@@ -2,7 +2,7 @@ name: car_diagnostic_ai
 description: Car Diagnostic AI - diagnostyka samochodowa
 publish_to: "none"
 
-version: 2.0.0+2
+version: 4.0.0+4
 
 environment:
   sdk: ">=3.0.0 <4.0.0"

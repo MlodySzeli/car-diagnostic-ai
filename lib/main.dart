@@ -1,7 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
+import 'database.dart';
+import 'models.dart';
 
 void main() {
   runApp(const CarDiagnosticApp());
@@ -24,460 +24,1002 @@ class CarDiagnosticApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF080C11),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: const MainPage(),
     );
   }
 }
 
-class Vehicle {
-  final String make;
-  final String model;
-  final String generation;
-  final String years;
-  final List<Engine> engines;
-
-  Vehicle({
-    required this.make,
-    required this.model,
-    required this.generation,
-    required this.years,
-    required this.engines,
-  });
-
-  factory Vehicle.fromJson(Map<String, dynamic> json) {
-    return Vehicle(
-      make: json['make'],
-      model: json['model'],
-      generation: json['generation'],
-      years: json['years'],
-      engines: (json['engines'] as List)
-          .map((e) => Engine.fromJson(e))
-          .toList(),
-    );
-  }
-}
-
-class Engine {
-  final String name;
-  final String code;
-  final String fuel;
-  final int power;
-
-  Engine({
-    required this.name,
-    required this.code,
-    required this.fuel,
-    required this.power,
-  });
-
-  factory Engine.fromJson(Map<String, dynamic> json) {
-    return Engine(
-      name: json['name'],
-      code: json['code'],
-      fuel: json['fuel'],
-      power: json['power_hp'],
-    );
-  }
-}
-
-class DtcCode {
-  final String code;
-  final String name;
-  final List<String> causes;
-  final List<String> checks;
-
-  DtcCode({
-    required this.code,
-    required this.name,
-    required this.causes,
-    required this.checks,
-  });
-
-  factory DtcCode.fromJson(Map<String, dynamic> json) {
-    return DtcCode(
-      code: json['code'],
-      name: json['name'],
-      causes: List<String>.from(json['causes']),
-      checks: List<String>.from(json['checks']),
-    );
-  }
-}
-
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class MainPage extends StatefulWidget {
+  const MainPage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<MainPage> createState() => _MainPageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  List<Vehicle> vehicles = [];
-  List<DtcCode> dtcCodes = [];
+class _MainPageState extends State<MainPage> {
+  final db = AppDatabase.instance;
 
-  String? make;
-  String? model;
-  String? generation;
-  Engine? engine;
-  String? year;
-  String? selectedDtc;
+  int currentPage = 0;
+
+  List<CarBrand> brands = [];
+  List<CarModel> models = [];
+  List<Generation> generations = [];
+  List<Engine> engines = [];
+  List<DtcCode> dtcs = [];
+
+  CarBrand? selectedBrand;
+  CarModel? selectedModel;
+  Generation? selectedGeneration;
+  Engine? selectedEngine;
+  DtcCode? selectedDtc;
 
   final problemController = TextEditingController();
+
+  bool loading = true;
 
   @override
   void initState() {
     super.initState();
-    loadDatabase();
+    initialize();
   }
 
-  Future<void> loadDatabase() async {
-    final vehicleData =
-        await rootBundle.loadString('assets/data/vehicles.json');
+  Future<void> initialize() async {
+    try {
+      await db.seedDatabase();
+      await loadBrands();
+      await loadDtcs();
+    } catch (e) {
+      debugPrint('Database error: $e');
+    }
 
-    final diagnosticData =
-        await rootBundle.loadString('assets/data/diagnostic_data.json');
+    if (mounted) {
+      setState(() {
+        loading = false;
+      });
+    }
+  }
 
-    final vehicleJson = jsonDecode(vehicleData);
-    final diagnosticJson = jsonDecode(diagnosticData);
+  Future<void> loadBrands() async {
+    final result = await db.getBrands();
+
+    if (!mounted) return;
 
     setState(() {
-      vehicles = (vehicleJson['vehicles'] as List)
-          .map((v) => Vehicle.fromJson(v))
-          .toList();
-
-      dtcCodes = (diagnosticJson['dtc'] as List)
-          .map((d) => DtcCode.fromJson(d))
-          .toList();
+      brands = result;
     });
   }
 
-  List<String> get makes {
-    return vehicles.map((v) => v.make).toSet().toList()..sort();
+  Future<void> loadDtcs() async {
+    final result = await db.getDtcCodes();
+
+    if (!mounted) return;
+
+    setState(() {
+      dtcs = result;
+    });
   }
 
-  List<String> get models {
-    if (make == null) return [];
+  Future<void> selectBrand(CarBrand? value) async {
+    if (value == null) return;
 
-    return vehicles
-        .where((v) => v.make == make)
-        .map((v) => v.model)
-        .toSet()
-        .toList()
-      ..sort();
+    final result = await db.getModels(value.id!);
+
+    setState(() {
+      selectedBrand = value;
+      selectedModel = null;
+      selectedGeneration = null;
+      selectedEngine = null;
+
+      models = result;
+      generations = [];
+      engines = [];
+    });
   }
 
-  List<Vehicle> get matchingVehicles {
-    return vehicles.where((v) {
-      return v.make == make && v.model == model;
-    }).toList();
+  Future<void> selectModel(CarModel? value) async {
+    if (value == null) return;
+
+    final result = await db.getGenerations(value.id!);
+
+    setState(() {
+      selectedModel = value;
+      selectedGeneration = null;
+      selectedEngine = null;
+
+      generations = result;
+      engines = [];
+    });
   }
 
-  List<String> get generations {
-    return matchingVehicles.map((v) => v.generation).toSet().toList();
+  Future<void> selectGeneration(Generation? value) async {
+    if (value == null) return;
+
+    final result = await db.getEngines(value.id!);
+
+    setState(() {
+      selectedGeneration = value;
+      selectedEngine = null;
+      engines = result;
+    });
   }
 
-  Vehicle? get selectedVehicle {
-    try {
-      return matchingVehicles.firstWhere(
-        (v) => v.generation == generation,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
+  Future<void> addBrandDialog() async {
+    final controller = TextEditingController();
 
-  List<Engine> get engines {
-    return selectedVehicle?.engines ?? [];
-  }
-
-  List<String> get years {
-    final vehicle = selectedVehicle;
-
-    if (vehicle == null) return [];
-
-    final match = RegExp(r'(\d{4})-(\d{4})').firstMatch(vehicle.years);
-
-    if (match == null) return [vehicle.years];
-
-    final start = int.parse(match.group(1)!);
-    final end = int.parse(match.group(2)!);
-
-    return List.generate(
-      end - start + 1,
-      (index) => '${start + index}',
-    ).reversed.toList();
-  }
-
-  void resetModel() {
-    model = null;
-    generation = null;
-    engine = null;
-    year = null;
-  }
-
-  void resetGeneration() {
-    generation = null;
-    engine = null;
-    year = null;
-  }
-
-  void resetEngine() {
-    engine = null;
-    year = null;
-  }
-
-  void diagnose() {
-    if (make == null ||
-        model == null ||
-        generation == null ||
-        problemController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Wybierz samochód i wpisz opis problemu.',
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Dodaj markę'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Nazwa marki',
+            hintText: 'Np. BMW',
           ),
         ),
-      );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ANULUJ'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+
+              if (name.isEmpty) return;
+
+              await db.addBrand(
+                CarBrand(name: name),
+              );
+
+              if (mounted) {
+                Navigator.pop(context);
+                await loadBrands();
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Dodano markę: $name'),
+                  ),
+                );
+              }
+            },
+            child: const Text('ZAPISZ'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+  }
+
+  Future<void> addModelDialog() async {
+    if (selectedBrand == null) {
+      showMessage('Najpierw wybierz markę.');
       return;
     }
 
-    DtcCode? dtc;
+    final controller = TextEditingController();
 
-    if (selectedDtc != null) {
-      try {
-        dtc = dtcCodes.firstWhere(
-          (d) => d.code == selectedDtc,
-        );
-      } catch (_) {}
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Dodaj model — ${selectedBrand!.name}'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Model',
+            hintText: 'Np. 320d',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ANULUJ'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+
+              if (name.isEmpty) return;
+
+              await db.addModel(
+                CarModel(
+                  brandId: selectedBrand!.id!,
+                  name: name,
+                ),
+              );
+
+              if (mounted) {
+                Navigator.pop(context);
+
+                final result =
+                    await db.getModels(selectedBrand!.id!);
+
+                setState(() {
+                  models = result;
+                });
+
+                showMessage('Dodano model: $name');
+              }
+            },
+            child: const Text('ZAPISZ'),
+          ),
+        ],
+      ),
+    );
+
+    controller.dispose();
+  }
+
+  Future<void> addGenerationDialog() async {
+    if (selectedModel == null) {
+      showMessage('Najpierw wybierz model.');
+      return;
+    }
+
+    final nameController = TextEditingController();
+    final fromController = TextEditingController();
+    final toController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          'Dodaj generację — ${selectedModel!.name}',
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Generacja',
+                  hintText: 'Np. E90',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: fromController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Rok od',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: toController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Rok do',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ANULUJ'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+
+              if (name.isEmpty) return;
+
+              await db.addGeneration(
+                Generation(
+                  modelId: selectedModel!.id!,
+                  name: name,
+                  yearFrom:
+                      int.tryParse(fromController.text.trim()),
+                  yearTo:
+                      int.tryParse(toController.text.trim()),
+                ),
+              );
+
+              if (mounted) {
+                Navigator.pop(context);
+
+                final result =
+                    await db.getGenerations(selectedModel!.id!);
+
+                setState(() {
+                  generations = result;
+                });
+
+                showMessage('Dodano generację: $name');
+              }
+            },
+            child: const Text('ZAPISZ'),
+          ),
+        ],
+      ),
+    );
+
+    nameController.dispose();
+    fromController.dispose();
+    toController.dispose();
+  }
+
+  Future<void> addEngineDialog() async {
+    if (selectedGeneration == null) {
+      showMessage('Najpierw wybierz generację.');
+      return;
+    }
+
+    final nameController = TextEditingController();
+    final codeController = TextEditingController();
+    final fuelController = TextEditingController();
+    final displacementController = TextEditingController();
+    final powerController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Dodaj silnik'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nazwa silnika',
+                  hintText: 'Np. 320d',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: codeController,
+                decoration: const InputDecoration(
+                  labelText: 'Kod silnika',
+                  hintText: 'Np. N47',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: fuelController,
+                decoration: const InputDecoration(
+                  labelText: 'Paliwo',
+                  hintText: 'Diesel / Benzyna / Hybrid',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: displacementController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Pojemność cm³',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: powerController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Moc KM',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ANULUJ'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = nameController.text.trim();
+              final code = codeController.text.trim();
+              final fuel = fuelController.text.trim();
+
+              if (name.isEmpty ||
+                  code.isEmpty ||
+                  fuel.isEmpty) {
+                return;
+              }
+
+              await db.addEngine(
+                Engine(
+                  generationId: selectedGeneration!.id!,
+                  name: name,
+                  code: code,
+                  fuel: fuel,
+                  displacement:
+                      int.tryParse(displacementController.text),
+                  power:
+                      int.tryParse(powerController.text),
+                ),
+              );
+
+              if (mounted) {
+                Navigator.pop(context);
+
+                final result =
+                    await db.getEngines(selectedGeneration!.id!);
+
+                setState(() {
+                  engines = result;
+                });
+
+                showMessage('Dodano silnik: $name');
+              }
+            },
+            child: const Text('ZAPISZ'),
+          ),
+        ],
+      ),
+    );
+
+    nameController.dispose();
+    codeController.dispose();
+    fuelController.dispose();
+    displacementController.dispose();
+    powerController.dispose();
+  }
+
+  Future<void> addDtcDialog() async {
+    final codeController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final causesController = TextEditingController();
+    final checksController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Dodaj kod DTC'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: codeController,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  labelText: 'Kod DTC',
+                  hintText: 'Np. P0299',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Opis błędu',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: causesController,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                  labelText: 'Możliwe przyczyny',
+                  hintText:
+                      'Każdą przyczynę wpisz w osobnej linii',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: checksController,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                  labelText: 'Co sprawdzić',
+                  hintText:
+                      'Każdy punkt wpisz w osobnej linii',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ANULUJ'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final code =
+                  codeController.text.trim().toUpperCase();
+
+              if (code.isEmpty) return;
+
+              await db.addDtc(
+                DtcCode(
+                  code: code,
+                  description:
+                      descriptionController.text.trim(),
+                  causes: causesController.text.trim(),
+                  checks: checksController.text.trim(),
+                ),
+              );
+
+              if (mounted) {
+                Navigator.pop(context);
+
+                await loadDtcs();
+
+                showMessage('Dodano kod DTC: $code');
+              }
+            },
+            child: const Text('ZAPISZ'),
+          ),
+        ],
+      ),
+    );
+
+    codeController.dispose();
+    descriptionController.dispose();
+    causesController.dispose();
+    checksController.dispose();
+  }
+
+  void showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+      ),
+    );
+  }
+
+  void diagnose() {
+    if (selectedBrand == null ||
+        selectedModel == null ||
+        selectedGeneration == null ||
+        problemController.text.trim().isEmpty) {
+      showMessage(
+        'Wybierz samochód i wpisz opis problemu.',
+      );
+      return;
     }
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => DiagnosisPage(
-          make: make!,
-          model: model!,
-          generation: generation!,
-          engine: engine,
-          year: year,
+          brand: selectedBrand!,
+          model: selectedModel!,
+          generation: selectedGeneration!,
+          engine: selectedEngine,
+          dtc: selectedDtc,
           problem: problemController.text.trim(),
-          dtc: dtc,
         ),
       ),
     );
   }
 
+  Widget dropdown<T>({
+    required String label,
+    required T? value,
+    required List<T> items,
+    required String Function(T) text,
+    required ValueChanged<T?> onChanged,
+    bool enabled = true,
+  }) {
+    return DropdownButtonFormField<T>(
+      initialValue: items.contains(value) ? value : null,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: const Color(0xFF111820),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      items: items
+          .map(
+            (item) => DropdownMenuItem<T>(
+              value: item,
+              child: Text(
+                text(item),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: enabled ? onChanged : null,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (loading) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 20),
+              Text('Ładowanie bazy samochodów...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'CAR DIAGNOSTIC AI',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
         ),
         centerTitle: true,
       ),
-      body: vehicles.isEmpty
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 1100,
+      body: Row(
+        children: [
+          NavigationRail(
+            selectedIndex: currentPage,
+            onDestinationSelected: (index) {
+              setState(() {
+                currentPage = index;
+              });
+            },
+            labelType: NavigationRailLabelType.all,
+            destinations: const [
+              NavigationRailDestination(
+                icon: Icon(Icons.car_repair),
+                selectedIcon: Icon(Icons.car_repair),
+                label: Text('Diagnoza'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.directions_car),
+                label: Text('Baza aut'),
+              ),
+              NavigationRailDestination(
+                icon: Icon(Icons.error_outline),
+                label: Text('DTC'),
+              ),
+            ],
+          ),
+          const VerticalDivider(width: 1),
+          Expanded(
+            child: currentPage == 0
+                ? buildDiagnosis()
+                : currentPage == 1
+                    ? buildDatabasePage()
+                    : buildDtcPage(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildDiagnosis() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 1050,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Diagnostyka samochodu',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
                 ),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(30),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Wybierz pojazd, kod DTC i opisz problem.',
+                style: TextStyle(
+                  color: Colors.grey.shade400,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 30),
+              sectionTitle('🚗 POJAZD'),
+              dropdown<CarBrand>(
+                label: 'Marka',
+                value: selectedBrand,
+                items: brands,
+                text: (b) => b.name,
+                onChanged: selectBrand,
+              ),
+              const SizedBox(height: 14),
+              dropdown<CarModel>(
+                label: 'Model',
+                value: selectedModel,
+                items: models,
+                text: (m) => m.name,
+                enabled: selectedBrand != null,
+                onChanged: selectModel,
+              ),
+              const SizedBox(height: 14),
+              dropdown<Generation>(
+                label: 'Generacja',
+                value: selectedGeneration,
+                items: generations,
+                text: (g) {
+                  if (g.yearFrom != null &&
+                      g.yearTo != null) {
+                    return '${g.name} (${g.yearFrom}-${g.yearTo})';
+                  }
+
+                  return g.name;
+                },
+                enabled: selectedModel != null,
+                onChanged: selectGeneration,
+              ),
+              const SizedBox(height: 14),
+              dropdown<Engine>(
+                label: 'Silnik',
+                value: selectedEngine,
+                items: engines,
+                text: (e) =>
+                    '${e.name} — ${e.code} — ${e.power ?? '?'} KM',
+                enabled: selectedGeneration != null,
+                onChanged: (value) {
+                  setState(() {
+                    selectedEngine = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 30),
+              sectionTitle('⚠️ KOD DTC'),
+              Row(
+                children: [
+                  Expanded(
+                    child: dropdown<DtcCode>(
+                      label: 'Wybierz kod DTC',
+                      value: selectedDtc,
+                      items: dtcs,
+                      text: (d) =>
+                          '${d.code} — ${d.description}',
+                      onChanged: (value) {
+                        setState(() {
+                          selectedDtc = value;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton.filled(
+                    tooltip: 'Dodaj DTC',
+                    onPressed: addDtcDialog,
+                    icon: const Icon(Icons.add),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 30),
+              sectionTitle('🔧 OPIS PROBLEMU'),
+              TextField(
+                controller: problemController,
+                minLines: 6,
+                maxLines: 10,
+                decoration: InputDecoration(
+                  hintText:
+                      'Np. BMW 320d szarpie podczas przyspieszania '
+                      'między 1500 a 2500 obr./min...',
+                  filled: true,
+                  fillColor: const Color(0xFF111820),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.all(20),
+                ),
+              ),
+              const SizedBox(height: 25),
+              SizedBox(
+                width: double.infinity,
+                height: 60,
+                child: FilledButton.icon(
+                  onPressed: diagnose,
+                  icon: const Icon(Icons.search),
+                  label: const Text(
+                    'DIAGNOZUJ',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildDatabasePage() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 1100,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Baza samochodów',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Dodawaj własne marki, modele, generacje i silniki.',
+                style: TextStyle(
+                  color: Colors.grey.shade400,
+                ),
+              ),
+              const SizedBox(height: 30),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  FilledButton.icon(
+                    onPressed: addBrandDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('DODAJ MARKĘ'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: addModelDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('DODAJ MODEL'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: addGenerationDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('DODAJ GENERACJĘ'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: addEngineDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text('DODAJ SILNIK'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 30),
+              buildSelectionSummary(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildSelectionSummary() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111820),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'AKTUALNIE WYBRANE',
+            style: TextStyle(
+              color: Colors.blue,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 15),
+          Text(
+            selectedBrand == null
+                ? 'Nie wybrano pojazdu.'
+                : [
+                    selectedBrand!.name,
+                    if (selectedModel != null)
+                      selectedModel!.name,
+                    if (selectedGeneration != null)
+                      selectedGeneration!.name,
+                    if (selectedEngine != null)
+                      '${selectedEngine!.name} (${selectedEngine!.code})',
+                  ].join(' → '),
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 25),
+          Text(
+            'Liczba marek w bazie: ${brands.length}',
+          ),
+          Text(
+            'Liczba kodów DTC: ${dtcs.length}',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildDtcPage() {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 1100,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Baza kodów DTC',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Wybieraj istniejące kody lub dodawaj własne.',
+                style: TextStyle(
+                  color: Colors.grey.shade400,
+                ),
+              ),
+              const SizedBox(height: 25),
+              FilledButton.icon(
+                onPressed: addDtcDialog,
+                icon: const Icon(Icons.add),
+                label: const Text('DODAJ WŁASNY KOD DTC'),
+              ),
+              const SizedBox(height: 25),
+              ...dtcs.map(
+                (dtc) => Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111820),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: ExpansionTile(
+                    title: Text(
+                      dtc.code,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: Text(dtc.description),
+                    childrenPadding:
+                        const EdgeInsets.fromLTRB(20, 0, 20, 20),
                     children: [
-                      const Text(
-                        'Diagnostyka samochodowa',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      Text(
-                        'Wybierz dokładną konfigurację samochodu.',
-                        style: TextStyle(
-                          color: Colors.grey.shade400,
-                          fontSize: 16,
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      sectionTitle('🚗 SAMOCHÓD'),
-
-                      dropdown(
-                        label: 'Marka',
-                        value: make,
-                        items: makes,
-                        onChanged: (value) {
-                          setState(() {
-                            make = value;
-                            resetModel();
-                          });
-                        },
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      dropdown(
-                        label: 'Model',
-                        value: model,
-                        items: models,
-                        enabled: make != null,
-                        onChanged: (value) {
-                          setState(() {
-                            model = value;
-                            resetGeneration();
-                          });
-                        },
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      dropdown(
-                        label: 'Generacja',
-                        value: generation,
-                        items: generations,
-                        enabled: model != null,
-                        onChanged: (value) {
-                          setState(() {
-                            generation = value;
-                            resetEngine();
-                          });
-                        },
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: dropdown(
-                              label: 'Silnik',
-                              value: engine?.name,
-                              items: engines
-                                  .map(
-                                    (e) => '${e.name} — ${e.code}',
-                                  )
-                                  .toList(),
-                              enabled: generation != null,
-                              onChanged: (value) {
-                                if (value == null) return;
-
-                                setState(() {
-                                  engine = engines.firstWhere(
-                                    (e) =>
-                                        '${e.name} — ${e.code}' ==
-                                        value,
-                                  );
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: dropdown(
-                              label: 'Rok',
-                              value: year,
-                              items: years,
-                              enabled: generation != null,
-                              onChanged: (value) {
-                                setState(() {
-                                  year = value;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      if (engine != null) ...[
-                        const SizedBox(height: 15),
-                        infoCard(
-                          title: 'SILNIK',
-                          text:
-                              '${engine!.name} | ${engine!.code}\n'
-                              '${engine!.fuel} | ${engine!.power} KM',
-                        ),
-                      ],
-
-                      const SizedBox(height: 30),
-
-                      sectionTitle('⚠️ KOD OBD / DTC'),
-
-                      dropdown(
-                        label: 'Kod błędu — opcjonalnie',
-                        value: selectedDtc,
-                        items: dtcCodes.map((d) => d.code).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedDtc = value;
-                          });
-                        },
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      sectionTitle('🔧 OPIS PROBLEMU'),
-
-                      TextField(
-                        controller: problemController,
-                        minLines: 6,
-                        maxLines: 10,
-                        decoration: InputDecoration(
-                          hintText:
-                              'Np. samochód szarpie podczas przyspieszania, '
-                              'traci moc przy 2000 obr./min...',
-                          filled: true,
-                          fillColor: const Color(0xFF111820),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.all(20),
-                        ),
-                      ),
-
-                      const SizedBox(height: 25),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 60,
-                        child: FilledButton.icon(
-                          onPressed: diagnose,
-                          icon: const Icon(Icons.search),
-                          label: const Text(
-                            'DIAGNOZUJ',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 17,
-                            ),
+                      if (dtc.causes.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'MOŻLIWE PRZYCZYNY\n\n${dtc.causes}',
                           ),
                         ),
-                      ),
-
-                      const SizedBox(height: 25),
-
-                      infoCard(
-                        title: 'V2',
-                        text:
-                            'Baza pojazdów i kodów diagnostycznych jest '
-                            'oddzielona od programu. Dzięki temu będziemy '
-                            'mogli ją później rozbudować bez przebudowy '
-                            'całej aplikacji.',
-                      ),
+                      const SizedBox(height: 15),
+                      if (dtc.checks.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'CO SPRAWDZIĆ\n\n${dtc.checks}',
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -494,70 +1036,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget dropdown({
-    required String label,
-    required String? value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-    bool enabled = true,
-  }) {
-    final safeValue = items.contains(value) ? value : null;
-
-    return DropdownButtonFormField<String>(
-      initialValue: safeValue,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: const Color(0xFF111820),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-      ),
-      items: items
-          .map(
-            (item) => DropdownMenuItem(
-              value: item,
-              child: Text(
-                item,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          )
-          .toList(),
-      onChanged: enabled ? onChanged : null,
-    );
-  }
-
-  Widget infoCard({
-    required String title,
-    required String text,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111820),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.blue,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(text),
-        ],
-      ),
-    );
-  }
-
   @override
   void dispose() {
     problemController.dispose();
@@ -566,33 +1044,44 @@ class _HomePageState extends State<HomePage> {
 }
 
 class DiagnosisPage extends StatelessWidget {
-  final String make;
-  final String model;
-  final String generation;
+  final CarBrand brand;
+  final CarModel model;
+  final Generation generation;
   final Engine? engine;
-  final String? year;
-  final String problem;
   final DtcCode? dtc;
+  final String problem;
 
   const DiagnosisPage({
     super.key,
-    required this.make,
+    required this.brand,
     required this.model,
     required this.generation,
     required this.engine,
-    required this.year,
-    required this.problem,
     required this.dtc,
+    required this.problem,
   });
 
   @override
   Widget build(BuildContext context) {
-    final causes = <String>[
-      if (dtc != null) ...dtc!.causes,
-      'Układ dolotowy',
-      'Układ paliwowy',
-      'Układ sterowania silnikiem',
-    ].toSet().toList();
+    final causes = <String>[];
+
+    if (dtc != null && dtc!.causes.isNotEmpty) {
+      causes.addAll(
+        dtc!.causes
+            .split('\n')
+            .where((e) => e.trim().isNotEmpty),
+      );
+    }
+
+    if (causes.isEmpty) {
+      causes.addAll([
+        'Układ dolotowy',
+        'Układ paliwowy',
+        'Układ zapłonowy / wtryskowy',
+        'Układ sterowania silnikiem',
+        'Czujniki silnika',
+      ]);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -615,30 +1104,30 @@ class DiagnosisPage extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 25),
-
-                card(
+                resultCard(
                   'SAMOCHÓD',
-                  '$make $model\n'
-                  '$generation\n'
-                  '${engine != null ? 'Silnik: ${engine!.name} (${engine!.code})\n' : ''}'
-                  '${year != null ? 'Rok: $year' : ''}',
+                  [
+                    '${brand.name} ${model.name}',
+                    'Generacja: ${generation.name}',
+                    if (engine != null)
+                      'Silnik: ${engine!.name} (${engine!.code})',
+                    if (engine != null)
+                      'Paliwo: ${engine!.fuel}',
+                    if (engine?.power != null)
+                      'Moc: ${engine!.power} KM',
+                  ].join('\n'),
                 ),
-
-                card(
-                  'PROBLEM',
+                resultCard(
+                  'OBJAW / PROBLEM',
                   problem,
                 ),
-
                 if (dtc != null)
-                  card(
+                  resultCard(
                     'KOD DTC',
-                    '${dtc!.code}\n${dtc!.name}',
+                    '${dtc!.code}\n${dtc!.description}',
                   ),
-
                 const SizedBox(height: 10),
-
                 const Text(
                   'MOŻLIWE PRZYCZYNY',
                   style: TextStyle(
@@ -646,26 +1135,38 @@ class DiagnosisPage extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 15),
-
-                ...causes.asMap().entries.map(
-                      (entry) => cause(
-                        entry.value,
-                        [
-                          82,
-                          70,
-                          61,
-                          52,
-                          43,
-                          35,
-                        ][entry.key.clamp(0, 5)],
-                      ),
+                ...causes.map(
+                  (cause) => Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111820),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-
-                if (dtc != null) ...[
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.warning_amber,
+                          color: Colors.orange,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            cause,
+                            style: const TextStyle(
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (dtc != null &&
+                    dtc!.checks.isNotEmpty) ...[
                   const SizedBox(height: 20),
-
                   const Text(
                     'CO SPRAWDZIĆ',
                     style: TextStyle(
@@ -673,51 +1174,44 @@ class DiagnosisPage extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 15),
-
-                  card(
+                  resultCard(
                     'PROCEDURA',
-                    dtc!.checks
-                        .asMap()
-                        .entries
-                        .map(
-                          (e) => '${e.key + 1}. ${e.value}',
-                        )
-                        .join('\n'),
+                    dtc!.checks,
                   ),
                 ],
-
-                const SizedBox(height: 20),
-
+                const SizedBox(height: 25),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.10),
+                    color: Colors.orange.withValues(
+                      alpha: 0.10,
+                    ),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.4),
+                      color: Colors.orange.withValues(
+                        alpha: 0.4,
+                      ),
                     ),
                   ),
                   child: const Text(
-                    'To jest analiza pomocnicza. Wynik nie jest '
-                    'potwierdzoną diagnozą mechaniczną. Przyczynę '
-                    'należy potwierdzić odpowiednimi pomiarami i testami.',
+                    'UWAGA: wynik ma charakter pomocniczy. '
+                    'Nie zastępuje profesjonalnej diagnostyki '
+                    'mechanicznej ani pomiarów pojazdu.',
                   ),
                 ),
-
                 const SizedBox(height: 25),
-
                 SizedBox(
                   width: double.infinity,
-                  height: 55,
-                  child: OutlinedButton.icon(
+                  height: 58,
+                  child: FilledButton.icon(
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
-                            'Wyszukiwanie internetowe dodamy w kolejnej wersji.',
+                            'Moduł wyszukiwania internetowego '
+                            'podłączymy w V4.',
                           ),
                         ),
                       );
@@ -736,7 +1230,10 @@ class DiagnosisPage extends StatelessWidget {
     );
   }
 
-  Widget card(String title, String text) {
+  Widget resultCard(
+    String title,
+    String text,
+  ) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 18),
@@ -762,45 +1259,6 @@ class DiagnosisPage extends StatelessWidget {
               fontSize: 16,
               height: 1.45,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget cause(String name, int probability) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF111820),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Text(
-                '$probability%',
-                style: const TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          LinearProgressIndicator(
-            value: probability / 100,
-            minHeight: 7,
           ),
         ],
       ),

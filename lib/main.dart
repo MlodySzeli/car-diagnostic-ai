@@ -1,34 +1,860 @@
 import 'package:flutter/material.dart';
+
 import 'database.dart';
 import 'models.dart';
 
-void main()=>runApp(const CarDiagnosticApp());
-class CarDiagnosticApp extends StatefulWidget{const CarDiagnosticApp({super.key});@override State<CarDiagnosticApp> createState()=>_CarDiagnosticAppState();}
-class _CarDiagnosticAppState extends State<CarDiagnosticApp>{bool en=false;@override Widget build(BuildContext c)=>MaterialApp(debugShowCheckedModeBanner:false,title:'Car Diagnostic AI v4',theme:ThemeData(colorSchemeSeed:Colors.blue,useMaterial3:true),home:HomePage(en:en,onLanguage:()=>setState(()=>en=!en)));}
-class HomePage extends StatefulWidget{final bool en;final VoidCallback onLanguage;const HomePage({super.key,required this.en,required this.onLanguage});@override State<HomePage> createState()=>_HomePageState();}
-class _HomePageState extends State<HomePage>{final db=AppDatabase.instance;int page=0;bool loading=true;List<CarBrand> brands=[];List<CarModel> models=[];List<Generation> generations=[];List<Engine> engines=[];List<Category> categories=[];List<Subcategory> subs=[];List<DtcCode> dtcs=[];CarBrand? brand;CarModel? model;Generation? generation;Category? category;String q='';String t(String pl,String en)=>widget.en?en:pl;
-@override void initState(){super.initState();_load();}
-Future<void> _load() async{setState(()=>loading=true);await db.seedDatabase();final b=await db.getBrands();final c=await db.getCategories();final d=await db.getDtcCodes(query:q);if(!mounted)return;setState((){brands=b;categories=c;dtcs=d;loading=false;});}
-Future<void> _selectBrand(CarBrand? x)async{if(x==null)return;final r=await db.getModels(x.id!);if(!mounted)return;setState((){brand=x;models=r;model=null;generations=[];generation=null;engines=[];});}
-Future<void> _selectModel(CarModel? x)async{if(x==null)return;final r=await db.getGenerations(x.id!);if(!mounted)return;setState((){model=x;generations=r;generation=null;engines=[];});}
-Future<void> _selectGeneration(Generation? x)async{if(x==null)return;final r=await db.getEngines(x.id!);if(!mounted)return;setState((){generation=x;engines=r;});}
-Future<void> _selectCategory(Category? x)async{if(x==null)return;final r=await db.getSubcategories(x.id!);if(!mounted)return;setState((){category=x;subs=r;});}
-void msg(String s){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
-Future<void> confirmDelete(String table,int id,String label)async{final ok=await showDialog<bool>(context:context,builder:(c)=>AlertDialog(title:Text(t('Usunąć?','Delete?')),content:Text('$label\n${t('Element i jego zależne dane zostaną usunięte.','The item and dependent data will be deleted.')}'),actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:Text(t('Anuluj','Cancel'))),FilledButton(onPressed:()=>Navigator.pop(c,true),child:Text(t('Usuń','Delete')))]));if(ok!=true)return;await db.remove(table,id);if(!mounted)return;await _load();if(!mounted)return;setState((){brand=null;model=null;generation=null;models=[];generations=[];engines=[];category=null;subs=[];});msg(t('Usunięto','Deleted'));}
-Future<void> dialog({required String title,required List<_Field> fields,required Future<void> Function(Map<String,String>) save})async{final cs={for(final f in fields)f.key:TextEditingController(text:f.value)};await showDialog(context:context,builder:(c)=>AlertDialog(title:Text(title),content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:fields.map((f)=>Padding(padding:const EdgeInsets.only(bottom:8),child:TextField(controller:cs[f.key],keyboardType:f.number?TextInputType.number:null,decoration:InputDecoration(labelText:f.label,border:const OutlineInputBorder())))).toList())),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:Text(t('Anuluj','Cancel'))),FilledButton(onPressed:()async{final v={for(final e in cs.entries)e.key:e.value.text.trim()};await save(v);if(!c.mounted)return;Navigator.pop(c);},child:Text(t('Zapisz','Save')))]));}
-Future<void> addEditBrand([CarBrand? x])=>dialog(title:x==null?t('Dodaj markę','Add brand'):t('Edytuj markę','Edit brand'),fields:[_Field('name',t('Nazwa *','Name *'),x?.name??'')],save:(v)async{if(v['name']!.isEmpty)return;if(x==null)await db.insert('brands',{'name':v['name']});else await db.update('brands',x.id!,{'name':v['name']});await _load();});
-Future<void> addEditModel([CarModel? x])async{if(x==null&&brand==null){msg(t('Najpierw wybierz markę','Select a brand first'));return;}await dialog(title:t('Model','Model'),fields:[_Field('name',t('Nazwa *','Name *'),x?.name??'')],save:(v)async{if(v['name']!.isEmpty)return;if(x==null)await db.insert('models',{'brand_id':brand!.id,'name':v['name']});else await db.update('models',x.id!,{'name':v['name']});if(brand!=null)await _selectBrand(brand);});}
-Future<void> addEditGeneration([Generation? x])async{if(x==null&&model==null){msg(t('Najpierw wybierz model','Select a model first'));return;}await dialog(title:t('Generacja','Generation'),fields:[_Field('name',t('Nazwa *','Name *'),x?.name??''),_Field('from',t('Rok od (opcjonalnie)','Year from (optional)'),x?.yearFrom?.toString()??'',true),_Field('to',t('Rok do (opcjonalnie)','Year to (optional)'),x?.yearTo?.toString()??'',true)],save:(v)async{if(v['name']!.isEmpty)return;final data={'name':v['name'],'year_from':int.tryParse(v['from']!), 'year_to':int.tryParse(v['to']!)};if(x==null){data['model_id']=model!.id;await db.insert('generations',data);}else await db.update('generations',x.id!,data);if(model!=null)await _selectModel(model);});}
-Future<void> addEditEngine([Engine? x])async{if(x==null&&generation==null){msg(t('Najpierw wybierz generację','Select a generation first'));return;}await dialog(title:t('Silnik','Engine'),fields:[_Field('name',t('Nazwa *','Name *'),x?.name??''),_Field('code',t('Kod (opcjonalnie)','Code (optional)'),x?.code??''),_Field('fuel',t('Paliwo (opcjonalnie)','Fuel (optional)'),x?.fuel??''),_Field('cc',t('Pojemność (opcjonalnie)','Displacement (optional)'),x?.displacement?.toString()??'',true),_Field('power',t('Moc KM (opcjonalnie)','Power HP (optional)'),x?.power?.toString()??'',true)],save:(v)async{if(v['name']!.isEmpty)return;final data={'name':v['name'],'code':_null(v['code']!), 'fuel':_null(v['fuel']!), 'displacement':int.tryParse(v['cc']!), 'power':int.tryParse(v['power']!)};if(x==null){data['generation_id']=generation!.id;await db.insert('engines',data);}else await db.update('engines',x.id!,data);if(generation!=null)await _selectGeneration(generation);});}
-String? _null(String x)=>x.isEmpty?null:x;
-Future<void> addEditCategory([Category? x])=>dialog(title:t('Kategoria','Category'),fields:[_Field('name',t('Nazwa *','Name *'),x?.name??'')],save:(v)async{if(v['name']!.isEmpty)return;if(x==null)await db.insert('categories',{'name':v['name']});else await db.update('categories',x.id!,{'name':v['name']});await _load();});
-Future<void> addEditSub([Subcategory? x])async{if(x==null&&category==null){msg(t('Najpierw wybierz kategorię','Select a category first'));return;}await dialog(title:t('Podkategoria','Subcategory'),fields:[_Field('name',t('Nazwa *','Name *'),x?.name??'')],save:(v)async{if(v['name']!.isEmpty)return;if(x==null)await db.insert('subcategories',{'category_id':category!.id,'name':v['name']});else await db.update('subcategories',x.id!,{'name':v['name']});if(category!=null)await _selectCategory(category);});}
-Future<void> addEditDtc([DtcCode? x])async=>dialog(title:x==null?t('Dodaj błąd DTC','Add DTC'):t('Edytuj DTC','Edit DTC'),fields:[_Field('code',t('Kod *','Code *'),x?.code??''),_Field('desc',t('Opis domyślny *','Default description *'),x?.description??''),_Field('pl',t('Opis po polsku (opcjonalnie)','Polish description (optional)'),x?.descriptionPl??''),_Field('en',t('Opis po angielsku (opcjonalnie)','English description (optional)'),x?.descriptionEn??''),_Field('causes',t('Przyczyny (opcjonalnie)','Causes (optional)'),x?.causes??''),_Field('checks',t('Sprawdzenie (opcjonalnie)','Checks (optional)'),x?.checks??'')],save:(v)async{if(v['code']!.isEmpty||v['desc']!.isEmpty)return;final data={'code':v['code'],'description':v['desc'],'description_pl':_null(v['pl']!),'description_en':_null(v['en']!),'causes':_null(v['causes']!), 'checks':_null(v['checks']!)};if(x==null)await db.insert('dtc_codes',data);else await db.update('dtc_codes',x.id!,data);await _load();});
-@override Widget build(BuildContext c){final titles=[t('Pojazdy','Vehicles'),t('Kategorie','Categories'),t('Błędy DTC','DTC codes')];return Scaffold(appBar:AppBar(title:Text('Car Diagnostic AI v4 — ${titles[page]}'),actions:[IconButton(onPressed:widget.onLanguage,icon:const Icon(Icons.language),tooltip:widget.en?'Polski':'English')]),body:loading?const Center(child:CircularProgressIndicator()):IndexedStack(index:page,children:[vehicles(),cats(),dtc()]),bottomNavigationBar:NavigationBar(selectedIndex:page,onDestinationSelected:(x)=>setState(()=>page=x),destinations:[NavigationDestination(icon:const Icon(Icons.directions_car),label:titles[0]),NavigationDestination(icon:const Icon(Icons.category),label:titles[1]),NavigationDestination(icon:const Icon(Icons.build),label:titles[2])]),floatingActionButton:FloatingActionButton.extended(onPressed:()=>page==0?addEditBrand():page==1?addEditCategory():addEditDtc(),icon:const Icon(Icons.add),label:Text(t('Dodaj','Add'))));}
-Widget section(String title,Widget child,VoidCallback add)=>Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[Expanded(child:Text(title,style:Theme.of(context).textTheme.titleMedium)),IconButton(onPressed:add,icon:const Icon(Icons.add_circle_outline))]),child])));
-Widget item(String text,VoidCallback tap,VoidCallback edit,VoidCallback del)=>ListTile(title:Text(text),onTap:tap,trailing:Wrap(children:[IconButton(onPressed:edit,icon:const Icon(Icons.edit_outlined)),IconButton(onPressed:del,icon:const Icon(Icons.delete_outline))]));
-Widget vehicles()=>ListView(padding:const EdgeInsets.all(12),children:[section(t('Marki','Brands'),Column(children:brands.map((x)=>item(x.name,()=>_selectBrand(x),()=>addEditBrand(x),()=>confirmDelete('brands',x.id!,x.name))).toList()),addEditBrand),if(brand!=null)section('${t('Modele','Models')} — ${brand!.name}',Column(children:models.map((x)=>item(x.name,()=>_selectModel(x),()=>addEditModel(x),()=>confirmDelete('models',x.id!,x.name))).toList()),addEditModel),if(model!=null)section('${t('Generacje','Generations')} — ${model!.name}',Column(children:generations.map((x)=>item('${x.name}${x.yearFrom!=null?' (${x.yearFrom}-${x.yearTo??''})':''}',()=>_selectGeneration(x),()=>addEditGeneration(x),()=>confirmDelete('generations',x.id!,x.name))).toList()),addEditGeneration),if(generation!=null)section('${t('Silniki','Engines')} — ${generation!.name}',Column(children:engines.map((x)=>item('${x.name}${x.code==null?'':' — ${x.code}'}',(){},()=>addEditEngine(x),()=>confirmDelete('engines',x.id!,x.name))).toList()),addEditEngine)]);
-Widget cats()=>ListView(padding:const EdgeInsets.all(12),children:[section(t('Kategorie','Categories'),Column(children:categories.map((x)=>item(x.name,()=>_selectCategory(x),()=>addEditCategory(x),()=>confirmDelete('categories',x.id!,x.name))).toList()),addEditCategory),if(category!=null)section('${t('Podkategorie','Subcategories')} — ${category!.name}',Column(children:subs.map((x)=>item(x.name,(){},()=>addEditSub(x),()=>confirmDelete('subcategories',x.id!,x.name))).toList()),addEditSub)]);
-Widget dtc()=>Column(children:[Padding(padding:const EdgeInsets.all(12),child:TextField(onChanged:(x)async{q=x;final r=await db.getDtcCodes(query:q);if(!mounted)return;setState(()=>dtcs=r);},decoration:InputDecoration(prefixIcon:const Icon(Icons.search),labelText:t('Szukaj kodu lub opisu','Search code or description'),border:const OutlineInputBorder()))),Expanded(child:ListView.builder(itemCount:dtcs.length,itemBuilder:(c,i){final x=dtcs[i];final desc=widget.en?(x.descriptionEn??x.description):(x.descriptionPl??x.description);return Card(child:ListTile(title:Text('${x.code} — $desc'),subtitle:Text([x.causes,x.checks].whereType<String>().where((e)=>e.isNotEmpty).join('\n')),trailing:Wrap(children:[IconButton(onPressed:()=>addEditDtc(x),icon:const Icon(Icons.edit_outlined)),IconButton(onPressed:()=>confirmDelete('dtc_codes',x.id!,x.code),icon:const Icon(Icons.delete_outline))]));}))]);}
+void main() {
+  runApp(const CarDiagnosticApp());
 }
-class _Field{final String key,label,value;final bool number;const _Field(this.key,this.label,this.value,[this.number=false]);}
+
+class CarDiagnosticApp extends StatefulWidget {
+  const CarDiagnosticApp({super.key});
+
+  @override
+  State<CarDiagnosticApp> createState() => _CarDiagnosticAppState();
+}
+
+class _CarDiagnosticAppState extends State<CarDiagnosticApp> {
+  bool english = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Car Diagnostic AI v4',
+      theme: ThemeData(
+        colorSchemeSeed: Colors.blue,
+        useMaterial3: true,
+      ),
+      home: HomePage(
+        english: english,
+        onLanguageChanged: () => setState(() => english = !english),
+      ),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({
+    super.key,
+    required this.english,
+    required this.onLanguageChanged,
+  });
+
+  final bool english;
+  final VoidCallback onLanguageChanged;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final db = AppDatabase.instance;
+
+  int page = 0;
+  bool loading = true;
+
+  List<CarBrand> brands = [];
+  List<CarModel> models = [];
+  List<Generation> generations = [];
+  List<Engine> engines = [];
+  List<Category> categories = [];
+  List<Subcategory> subcategories = [];
+  List<DtcCode> dtcs = [];
+
+  CarBrand? selectedBrand;
+  CarModel? selectedModel;
+  Generation? selectedGeneration;
+  Category? selectedCategory;
+
+  String searchQuery = '';
+
+  String tr(String pl, String en) => widget.english ? en : pl;
+
+  @override
+  void initState() {
+    super.initState();
+    loadAll();
+  }
+
+  Future<void> loadAll() async {
+    if (mounted) setState(() => loading = true);
+
+    await db.seedDatabase();
+    final newBrands = await db.getBrands();
+    final newCategories = await db.getCategories();
+    final newDtcs = await db.getDtcCodes(query: searchQuery);
+
+    if (!mounted) return;
+
+    setState(() {
+      brands = newBrands;
+      categories = newCategories;
+      dtcs = newDtcs;
+      loading = false;
+    });
+  }
+
+  Future<void> selectBrand(CarBrand item) async {
+    final result = await db.getModels(item.id!);
+    if (!mounted) return;
+
+    setState(() {
+      selectedBrand = item;
+      models = result;
+      selectedModel = null;
+      generations = [];
+      selectedGeneration = null;
+      engines = [];
+    });
+  }
+
+  Future<void> selectModel(CarModel item) async {
+    final result = await db.getGenerations(item.id!);
+    if (!mounted) return;
+
+    setState(() {
+      selectedModel = item;
+      generations = result;
+      selectedGeneration = null;
+      engines = [];
+    });
+  }
+
+  Future<void> selectGeneration(Generation item) async {
+    final result = await db.getEngines(item.id!);
+    if (!mounted) return;
+
+    setState(() {
+      selectedGeneration = item;
+      engines = result;
+    });
+  }
+
+  Future<void> selectCategory(Category item) async {
+    final result = await db.getSubcategories(item.id!);
+    if (!mounted) return;
+
+    setState(() {
+      selectedCategory = item;
+      subcategories = result;
+    });
+  }
+
+  void message(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text)),
+    );
+  }
+
+  Future<void> showEditDialog({
+    required String title,
+    required List<_Field> fields,
+    required Future<void> Function(Map<String, String>) onSave,
+  }) async {
+    final controllers = {
+      for (final field in fields)
+        field.key: TextEditingController(text: field.value),
+    };
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final field in fields)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: TextField(
+                      controller: controllers[field.key],
+                      keyboardType:
+                          field.number ? TextInputType.number : null,
+                      decoration: InputDecoration(
+                        labelText: field.label,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(tr('Anuluj', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final values = {
+                  for (final entry in controllers.entries)
+                    entry.key: entry.value.text.trim(),
+                };
+
+                await onSave(values);
+
+                if (!dialogContext.mounted) return;
+                Navigator.pop(dialogContext);
+              },
+              child: Text(tr('Zapisz', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+
+    for (final controller in controllers.values) {
+      controller.dispose();
+    }
+  }
+
+  Future<void> confirmDelete(String table, int id, String label) async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('Usunąć?', 'Delete?')),
+        content: Text(
+          '$label\n\n${tr(
+            'Element i zależne dane zostaną usunięte.',
+            'The item and dependent data will be deleted.',
+          )}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(tr('Anuluj', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(tr('Usuń', 'Delete')),
+          ),
+        ],
+      ),
+    );
+
+    if (accepted != true) return;
+
+    await db.remove(table, id);
+    if (!mounted) return;
+
+    selectedBrand = null;
+    selectedModel = null;
+    selectedGeneration = null;
+    selectedCategory = null;
+    models = [];
+    generations = [];
+    engines = [];
+    subcategories = [];
+
+    await loadAll();
+    if (!mounted) return;
+
+    message(tr('Usunięto', 'Deleted'));
+  }
+
+  Future<void> editBrand([CarBrand? item]) async {
+    await showEditDialog(
+      title: item == null
+          ? tr('Dodaj markę', 'Add brand')
+          : tr('Edytuj markę', 'Edit brand'),
+      fields: [
+        _Field('name', tr('Nazwa *', 'Name *'), item?.name ?? ''),
+      ],
+      onSave: (values) async {
+        final name = values['name']!;
+        if (name.isEmpty) return;
+
+        if (item == null) {
+          await db.insert('brands', {'name': name});
+        } else {
+          await db.update('brands', item.id!, {'name': name});
+        }
+
+        await loadAll();
+      },
+    );
+  }
+
+  Future<void> editModel([CarModel? item]) async {
+    if (item == null && selectedBrand == null) {
+      message(tr('Najpierw wybierz markę', 'Select a brand first'));
+      return;
+    }
+
+    await showEditDialog(
+      title: item == null
+          ? tr('Dodaj model', 'Add model')
+          : tr('Edytuj model', 'Edit model'),
+      fields: [
+        _Field('name', tr('Nazwa *', 'Name *'), item?.name ?? ''),
+      ],
+      onSave: (values) async {
+        final name = values['name']!;
+        if (name.isEmpty) return;
+
+        final brandId = item?.brandId ?? selectedBrand!.id!;
+
+        if (item == null) {
+          await db.insert(
+            'models',
+            {'brand_id': brandId, 'name': name},
+          );
+        } else {
+          await db.update('models', item.id!, {'name': name});
+        }
+
+        if (selectedBrand != null) {
+          await selectBrand(selectedBrand!);
+        }
+      },
+    );
+  }
+
+  Future<void> editGeneration([Generation? item]) async {
+    if (item == null && selectedModel == null) {
+      message(tr('Najpierw wybierz model', 'Select a model first'));
+      return;
+    }
+
+    await showEditDialog(
+      title: item == null
+          ? tr('Dodaj generację', 'Add generation')
+          : tr('Edytuj generację', 'Edit generation'),
+      fields: [
+        _Field('name', tr('Nazwa *', 'Name *'), item?.name ?? ''),
+        _Field(
+          'from',
+          tr('Rok od (opcjonalnie)', 'Year from (optional)'),
+          item?.yearFrom?.toString() ?? '',
+          number: true,
+        ),
+        _Field(
+          'to',
+          tr('Rok do (opcjonalnie)', 'Year to (optional)'),
+          item?.yearTo?.toString() ?? '',
+          number: true,
+        ),
+      ],
+      onSave: (values) async {
+        final name = values['name']!;
+        if (name.isEmpty) return;
+
+        final data = <String, Object?>{
+          'name': name,
+          'year_from': int.tryParse(values['from']!),
+          'year_to': int.tryParse(values['to']!),
+        };
+
+        if (item == null) {
+          data['model_id'] = selectedModel!.id!;
+          await db.insert('generations', data);
+        } else {
+          await db.update('generations', item.id!, data);
+        }
+
+        if (selectedModel != null) {
+          await selectModel(selectedModel!);
+        }
+      },
+    );
+  }
+
+  Future<void> editEngine([Engine? item]) async {
+    if (item == null && selectedGeneration == null) {
+      message(tr('Najpierw wybierz generację', 'Select a generation first'));
+      return;
+    }
+
+    await showEditDialog(
+      title: item == null
+          ? tr('Dodaj silnik', 'Add engine')
+          : tr('Edytuj silnik', 'Edit engine'),
+      fields: [
+        _Field('name', tr('Nazwa *', 'Name *'), item?.name ?? ''),
+        _Field('code', tr('Kod', 'Code'), item?.code ?? ''),
+        _Field('fuel', tr('Paliwo', 'Fuel'), item?.fuel ?? ''),
+        _Field(
+          'displacement',
+          tr('Pojemność', 'Displacement'),
+          item?.displacement?.toString() ?? '',
+          number: true,
+        ),
+        _Field(
+          'power',
+          tr('Moc KM', 'Power HP'),
+          item?.power?.toString() ?? '',
+          number: true,
+        ),
+      ],
+      onSave: (values) async {
+        final name = values['name']!;
+        if (name.isEmpty) return;
+
+        final data = <String, Object?>{
+          'name': name,
+          'code': emptyToNull(values['code']!),
+          'fuel': emptyToNull(values['fuel']!),
+          'displacement': int.tryParse(values['displacement']!),
+          'power': int.tryParse(values['power']!),
+        };
+
+        if (item == null) {
+          data['generation_id'] = selectedGeneration!.id!;
+          await db.insert('engines', data);
+        } else {
+          await db.update('engines', item.id!, data);
+        }
+
+        if (selectedGeneration != null) {
+          await selectGeneration(selectedGeneration!);
+        }
+      },
+    );
+  }
+
+  Future<void> editCategory([Category? item]) async {
+    await showEditDialog(
+      title: item == null
+          ? tr('Dodaj kategorię', 'Add category')
+          : tr('Edytuj kategorię', 'Edit category'),
+      fields: [
+        _Field('name', tr('Nazwa *', 'Name *'), item?.name ?? ''),
+      ],
+      onSave: (values) async {
+        final name = values['name']!;
+        if (name.isEmpty) return;
+
+        if (item == null) {
+          await db.insert('categories', {'name': name});
+        } else {
+          await db.update('categories', item.id!, {'name': name});
+        }
+
+        await loadAll();
+      },
+    );
+  }
+
+  Future<void> editSubcategory([Subcategory? item]) async {
+    if (item == null && selectedCategory == null) {
+      message(tr('Najpierw wybierz kategorię', 'Select a category first'));
+      return;
+    }
+
+    await showEditDialog(
+      title: item == null
+          ? tr('Dodaj podkategorię', 'Add subcategory')
+          : tr('Edytuj podkategorię', 'Edit subcategory'),
+      fields: [
+        _Field('name', tr('Nazwa *', 'Name *'), item?.name ?? ''),
+      ],
+      onSave: (values) async {
+        final name = values['name']!;
+        if (name.isEmpty) return;
+
+        if (item == null) {
+          await db.insert(
+            'subcategories',
+            {'category_id': selectedCategory!.id!, 'name': name},
+          );
+        } else {
+          await db.update('subcategories', item.id!, {'name': name});
+        }
+
+        if (selectedCategory != null) {
+          await selectCategory(selectedCategory!);
+        }
+      },
+    );
+  }
+
+  Future<void> editDtc([DtcCode? item]) async {
+    await showEditDialog(
+      title: item == null
+          ? tr('Dodaj błąd DTC', 'Add DTC code')
+          : tr('Edytuj błąd DTC', 'Edit DTC code'),
+      fields: [
+        _Field('code', tr('Kod *', 'Code *'), item?.code ?? ''),
+        _Field(
+          'description',
+          tr('Opis domyślny *', 'Default description *'),
+          item?.description ?? '',
+        ),
+        _Field(
+          'pl',
+          tr('Opis po polsku', 'Polish description'),
+          item?.descriptionPl ?? '',
+        ),
+        _Field(
+          'en',
+          tr('Opis po angielsku', 'English description'),
+          item?.descriptionEn ?? '',
+        ),
+        _Field('causes', tr('Przyczyny', 'Causes'), item?.causes ?? ''),
+        _Field('checks', tr('Sprawdzenie', 'Checks'), item?.checks ?? ''),
+      ],
+      onSave: (values) async {
+        if (values['code']!.isEmpty ||
+            values['description']!.isEmpty) {
+          return;
+        }
+
+        final data = <String, Object?>{
+          'code': values['code'],
+          'description': values['description'],
+          'description_pl': emptyToNull(values['pl']!),
+          'description_en': emptyToNull(values['en']!),
+          'causes': emptyToNull(values['causes']!),
+          'checks': emptyToNull(values['checks']!),
+        };
+
+        if (item == null) {
+          await db.insert('dtc_codes', data);
+        } else {
+          await db.update('dtc_codes', item.id!, data);
+        }
+
+        await loadAll();
+      },
+    );
+  }
+
+  String? emptyToNull(String value) {
+    return value.trim().isEmpty ? null : value.trim();
+  }
+
+  Widget actionItem({
+    required String text,
+    required VoidCallback onTap,
+    required VoidCallback onEdit,
+    required VoidCallback onDelete,
+  }) {
+    return ListTile(
+      title: Text(text),
+      onTap: onTap,
+      trailing: Wrap(
+        children: [
+          IconButton(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined),
+          ),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget section(
+    String title,
+    List<Widget> children,
+    VoidCallback onAdd,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
+              ],
+            ),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget vehiclesPage() {
+    final widgets = <Widget>[
+      section(
+        tr('Marki', 'Brands'),
+        brands
+            .map(
+              (item) => actionItem(
+                text: item.name,
+                onTap: () => selectBrand(item),
+                onEdit: () => editBrand(item),
+                onDelete: () =>
+                    confirmDelete('brands', item.id!, item.name),
+              ),
+            )
+            .toList(),
+        () => editBrand(),
+      ),
+    ];
+
+    if (selectedBrand != null) {
+      widgets.add(
+        section(
+          '${tr('Modele', 'Models')} — ${selectedBrand!.name}',
+          models
+              .map(
+                (item) => actionItem(
+                  text: item.name,
+                  onTap: () => selectModel(item),
+                  onEdit: () => editModel(item),
+                  onDelete: () =>
+                      confirmDelete('models', item.id!, item.name),
+                ),
+              )
+              .toList(),
+          () => editModel(),
+        ),
+      );
+    }
+
+    if (selectedModel != null) {
+      widgets.add(
+        section(
+          '${tr('Generacje', 'Generations')} — ${selectedModel!.name}',
+          generations
+              .map(
+                (item) => actionItem(
+                  text: '${item.name}'
+                      '${item.yearFrom == null ? '' : ' (${item.yearFrom}-${item.yearTo ?? ''})'}',
+                  onTap: () => selectGeneration(item),
+                  onEdit: () => editGeneration(item),
+                  onDelete: () =>
+                      confirmDelete('generations', item.id!, item.name),
+                ),
+              )
+              .toList(),
+          () => editGeneration(),
+        ),
+      );
+    }
+
+    if (selectedGeneration != null) {
+      widgets.add(
+        section(
+          '${tr('Silniki', 'Engines')} — ${selectedGeneration!.name}',
+          engines
+              .map(
+                (item) => actionItem(
+                  text: '${item.name}${item.code == null ? '' : ' — ${item.code}'}',
+                  onTap: () {},
+                  onEdit: () => editEngine(item),
+                  onDelete: () =>
+                      confirmDelete('engines', item.id!, item.name),
+                ),
+              )
+              .toList(),
+          () => editEngine(),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: widgets,
+    );
+  }
+
+  Widget categoriesPage() {
+    final widgets = <Widget>[
+      section(
+        tr('Kategorie', 'Categories'),
+        categories
+            .map(
+              (item) => actionItem(
+                text: item.name,
+                onTap: () => selectCategory(item),
+                onEdit: () => editCategory(item),
+                onDelete: () =>
+                    confirmDelete('categories', item.id!, item.name),
+              ),
+            )
+            .toList(),
+        () => editCategory(),
+      ),
+    ];
+
+    if (selectedCategory != null) {
+      widgets.add(
+        section(
+          '${tr('Podkategorie', 'Subcategories')} — ${selectedCategory!.name}',
+          subcategories
+              .map(
+                (item) => actionItem(
+                  text: item.name,
+                  onTap: () {},
+                  onEdit: () => editSubcategory(item),
+                  onDelete: () =>
+                      confirmDelete('subcategories', item.id!, item.name),
+                ),
+              )
+              .toList(),
+          () => editSubcategory(),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: widgets,
+    );
+  }
+
+  Widget dtcPage() {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: TextField(
+            onChanged: (value) async {
+              searchQuery = value;
+              final result = await db.getDtcCodes(query: searchQuery);
+              if (!mounted) return;
+              setState(() => dtcs = result);
+            },
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              labelText: tr(
+                'Szukaj kodu lub opisu',
+                'Search code or description',
+              ),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: dtcs.length,
+            itemBuilder: (context, index) {
+              final item = dtcs[index];
+              final description = widget.english
+                  ? (item.descriptionEn ?? item.description)
+                  : (item.descriptionPl ?? item.description);
+
+              final details = <String>[
+                if (item.causes != null && item.causes!.isNotEmpty)
+                  item.causes!,
+                if (item.checks != null && item.checks!.isNotEmpty)
+                  item.checks!,
+              ];
+
+              return Card(
+                child: ListTile(
+                  title: Text('${item.code} — $description'),
+                  subtitle: details.isEmpty
+                      ? null
+                      : Text(details.join('\n')),
+                  trailing: Wrap(
+                    children: [
+                      IconButton(
+                        onPressed: () => editDtc(item),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        onPressed: () =>
+                            confirmDelete('dtc_codes', item.id!, item.code),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final titles = [
+      tr('Pojazdy', 'Vehicles'),
+      tr('Kategorie', 'Categories'),
+      tr('Błędy DTC', 'DTC codes'),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Car Diagnostic AI v4 — ${titles[page]}'),
+        actions: [
+          IconButton(
+            onPressed: widget.onLanguageChanged,
+            icon: const Icon(Icons.language),
+            tooltip: widget.english ? 'Polski' : 'English',
+          ),
+        ],
+      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : IndexedStack(
+              index: page,
+              children: [
+                vehiclesPage(),
+                categoriesPage(),
+                dtcPage(),
+              ],
+            ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: page,
+        onDestinationSelected: (value) {
+          setState(() => page = value);
+        },
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.directions_car),
+            label: titles[0],
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.category),
+            label: titles[1],
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.build),
+            label: titles[2],
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          if (page == 0) {
+            editBrand();
+          } else if (page == 1) {
+            editCategory();
+          } else {
+            editDtc();
+          }
+        },
+        icon: const Icon(Icons.add),
+        label: Text(tr('Dodaj', 'Add')),
+      ),
+    );
+  }
+}
+
+class _Field {
+  const _Field(
+    this.key,
+    this.label,
+    this.value, {
+    this.number = false,
+  });
+
+  final String key;
+  final String label;
+  final String value;
+  final bool number;
+}

@@ -104,6 +104,8 @@ class _MainPageState extends State<MainPage> {
 
     final result = await db.getModels(value.id!);
 
+    if (!mounted) return;
+
     setState(() {
       selectedBrand = value;
       selectedModel = null;
@@ -121,6 +123,8 @@ class _MainPageState extends State<MainPage> {
 
     final result = await db.getGenerations(value.id!);
 
+    if (!mounted) return;
+
     setState(() {
       selectedModel = value;
       selectedGeneration = null;
@@ -135,6 +139,8 @@ class _MainPageState extends State<MainPage> {
     if (value == null) return;
 
     final result = await db.getEngines(value.id!);
+
+    if (!mounted) return;
 
     setState(() {
       selectedGeneration = value;
@@ -162,31 +168,26 @@ class _MainPageState extends State<MainPage> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('ANULUJ'),
-      ),
-FilledButton(
-  onPressed: () async {
-    final name = controller.text.trim();
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = controller.text.trim();
 
-    if (name.isEmpty) return;
+              if (name.isEmpty) return;
 
-    await db.addBrand(
-      CarBrand(name: name),
-    );
+              await db.addBrand(
+                CarBrand(name: name),
+              );
 
-    if (!mounted) return;
+              if (!mounted) return;
 
-    Navigator.pop(context);
+              Navigator.pop(context);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Marka została dodana pomyślnie'),
-      ),
-    );
-  },
-  child: const Text('Dodaj'),
-),
-);
-              }
+              await loadBrands();
+
+              if (!mounted) return;
+
+              showMessage('Dodano markę: $name');
             },
             child: const Text('ZAPISZ'),
           ),
@@ -228,25 +229,28 @@ FilledButton(
 
               if (name.isEmpty) return;
 
+              final brandId = selectedBrand!.id!;
+
               await db.addModel(
                 CarModel(
-                  brandId: selectedBrand!.id!,
+                  brandId: brandId,
                   name: name,
                 ),
               );
 
-              if (mounted) {
-                Navigator.pop(context);
+              if (!mounted) return;
 
-                final result =
-                    await db.getModels(selectedBrand!.id!);
+              Navigator.pop(context);
 
-                setState(() {
-                  models = result;
-                });
+              final result = await db.getModels(brandId);
 
-                showMessage('Dodano model: $name');
-              }
+              if (!mounted) return;
+
+              setState(() {
+                models = result;
+              });
+
+              showMessage('Dodano model: $name');
             },
             child: const Text('ZAPISZ'),
           ),
@@ -314,9 +318,11 @@ FilledButton(
 
               if (name.isEmpty) return;
 
+              final modelId = selectedModel!.id!;
+
               await db.addGeneration(
                 Generation(
-                  modelId: selectedModel!.id!,
+                  modelId: modelId,
                   name: name,
                   yearFrom:
                       int.tryParse(fromController.text.trim()),
@@ -325,18 +331,19 @@ FilledButton(
                 ),
               );
 
-              if (mounted) {
-                Navigator.pop(context);
+              if (!mounted) return;
 
-                final result =
-                    await db.getGenerations(selectedModel!.id!);
+              Navigator.pop(context);
 
-                setState(() {
-                  generations = result;
-                });
+              final result = await db.getGenerations(modelId);
 
-                showMessage('Dodano generację: $name');
-              }
+              if (!mounted) return;
+
+              setState(() {
+                generations = result;
+              });
+
+              showMessage('Dodano generację: $name');
             },
             child: const Text('ZAPISZ'),
           ),
@@ -428,9 +435,11 @@ FilledButton(
                 return;
               }
 
+              final generationId = selectedGeneration!.id!;
+
               await db.addEngine(
                 Engine(
-                  generationId: selectedGeneration!.id!,
+                  generationId: generationId,
                   name: name,
                   code: code,
                   fuel: fuel,
@@ -441,18 +450,19 @@ FilledButton(
                 ),
               );
 
-              if (mounted) {
-                Navigator.pop(context);
+              if (!mounted) return;
 
-                final result =
-                    await db.getEngines(selectedGeneration!.id!);
+              Navigator.pop(context);
 
-                setState(() {
-                  engines = result;
-                });
+              final result = await db.getEngines(generationId);
 
-                showMessage('Dodano silnik: $name');
-              }
+              if (!mounted) return;
+
+              setState(() {
+                engines = result;
+              });
+
+              showMessage('Dodano silnik: $name');
             },
             child: const Text('ZAPISZ'),
           ),
@@ -543,13 +553,15 @@ FilledButton(
                 ),
               );
 
-              if (mounted) {
-                Navigator.pop(context);
+              if (!mounted) return;
 
-                await loadDtcs();
+              Navigator.pop(context);
 
-                showMessage('Dodano kod DTC: $code');
-              }
+              await loadDtcs();
+
+              if (!mounted) return;
+
+              showMessage('Dodano kod DTC: $code');
             },
             child: const Text('ZAPISZ'),
           ),

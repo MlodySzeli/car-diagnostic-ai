@@ -34,18 +34,43 @@ jobs:
           Copy-Item "pubspec.yaml" "car_diagnostic_build\pubspec.yaml" -Force
 
           New-Item -ItemType Directory -Force "car_diagnostic_build\lib" | Out-Null
-
           Copy-Item "lib\main.dart" "car_diagnostic_build\lib\main.dart" -Force
 
-      - name: Remove default Flutter files
+          New-Item -ItemType Directory -Force "car_diagnostic_build\assets\data" | Out-Null
+
+          Copy-Item "assets\data\vehicles.json" `
+            "car_diagnostic_build\assets\data\vehicles.json" -Force
+
+          Copy-Item "assets\data\diagnostic_data.json" `
+            "car_diagnostic_build\assets\data\diagnostic_data.json" -Force
+
+      - name: Verify application files
+        shell: pwsh
+        run: |
+          Write-Host "Checking application files..."
+
+          if (!(Test-Path "car_diagnostic_build\lib\main.dart")) {
+            Write-Error "main.dart was not found."
+            exit 1
+          }
+
+          if (!(Test-Path "car_diagnostic_build\assets\data\vehicles.json")) {
+            Write-Error "vehicles.json was not found."
+            exit 1
+          }
+
+          if (!(Test-Path "car_diagnostic_build\assets\data\diagnostic_data.json")) {
+            Write-Error "diagnostic_data.json was not found."
+            exit 1
+          }
+
+          Write-Host "All application files found successfully."
+
+      - name: Remove default Flutter test
         shell: pwsh
         run: |
           if (Test-Path "car_diagnostic_build\test") {
             Remove-Item "car_diagnostic_build\test" -Recurse -Force
-          }
-
-          if (Test-Path "car_diagnostic_build\lib\main.dart") {
-            Write-Host "Custom main.dart copied successfully."
           }
 
       - name: Install dependencies
@@ -90,13 +115,11 @@ jobs:
           Write-Host "========================================"
           Write-Host "WINDOWS BUILD SUCCESSFUL"
           Write-Host "========================================"
-          Write-Host ""
 
           foreach ($exe in $exeFiles) {
             Write-Host "EXE: $($exe.FullName)"
           }
 
-          Write-Host ""
           Write-Host "========================================"
 
       - name: Create ZIP package

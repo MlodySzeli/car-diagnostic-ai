@@ -162,27 +162,29 @@ class _MainPageState extends State<MainPage> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('ANULUJ'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final name = controller.text.trim();
+      ),
+FilledButton(
+  onPressed: () async {
+    final name = controller.text.trim();
 
-              if (name.isEmpty) return;
+    if (name.isEmpty) return;
 
-              await db.addBrand(
-                CarBrand(name: name),
-              );
+    await db.addBrand(
+      CarBrand(name: name),
+    );
 
-              if (mounted) {
-                Navigator.pop(context);
-              await _jakasFunkcja();
+    if (!mounted) return;
 
-if (!mounted) return;
+    Navigator.pop(context);
 
-ScaffoldMessenger.of(context).showSnackBar(
-  const SnackBar(
-    content: Text('Operacja zakończona pomyślnie'),
-  ),
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Marka została dodana pomyślnie'),
+      ),
+    );
+  },
+  child: const Text('Dodaj'),
+),
 );
               }
             },

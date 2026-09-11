@@ -22,7 +22,6 @@ class CarBrand {
   }
 }
 
-
 class CarModel {
   final int? id;
   final int brandId;
@@ -50,7 +49,6 @@ class CarModel {
     );
   }
 }
-
 
 class Generation {
   final int? id;
@@ -87,7 +85,6 @@ class Generation {
     );
   }
 }
-
 
 class Engine {
   final int? id;
@@ -132,7 +129,6 @@ class Engine {
     );
   }
 }
-
 
 class DtcCode {
   final int? id;

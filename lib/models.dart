@@ -1,8 +1,8 @@
 class CarBrand {
-  int? id;
-  String name;
+  final int? id;
+  final String name;
 
-  CarBrand({
+  const CarBrand({
     this.id,
     required this.name,
   });
@@ -16,18 +16,19 @@ class CarBrand {
 
   factory CarBrand.fromMap(Map<String, dynamic> map) {
     return CarBrand(
-      id: map['id'],
-      name: map['name'],
+      id: map['id'] as int?,
+      name: map['name'] as String,
     );
   }
 }
 
-class CarModel {
-  int? id;
-  int brandId;
-  String name;
 
-  CarModel({
+class CarModel {
+  final int? id;
+  final int brandId;
+  final String name;
+
+  const CarModel({
     this.id,
     required this.brandId,
     required this.name,
@@ -43,21 +44,22 @@ class CarModel {
 
   factory CarModel.fromMap(Map<String, dynamic> map) {
     return CarModel(
-      id: map['id'],
-      brandId: map['brand_id'],
-      name: map['name'],
+      id: map['id'] as int?,
+      brandId: map['brand_id'] as int,
+      name: map['name'] as String,
     );
   }
 }
 
-class Generation {
-  int? id;
-  int modelId;
-  String name;
-  int? yearFrom;
-  int? yearTo;
 
-  Generation({
+class Generation {
+  final int? id;
+  final int modelId;
+  final String name;
+  final int? yearFrom;
+  final int? yearTo;
+
+  const Generation({
     this.id,
     required this.modelId,
     required this.name,
@@ -77,25 +79,26 @@ class Generation {
 
   factory Generation.fromMap(Map<String, dynamic> map) {
     return Generation(
-      id: map['id'],
-      modelId: map['model_id'],
-      name: map['name'],
-      yearFrom: map['year_from'],
-      yearTo: map['year_to'],
+      id: map['id'] as int?,
+      modelId: map['model_id'] as int,
+      name: map['name'] as String,
+      yearFrom: map['year_from'] as int?,
+      yearTo: map['year_to'] as int?,
     );
   }
 }
 
-class Engine {
-  int? id;
-  int generationId;
-  String name;
-  String code;
-  String fuel;
-  int? displacement;
-  int? power;
 
-  Engine({
+class Engine {
+  final int? id;
+  final int generationId;
+  final String name;
+  final String code;
+  final String fuel;
+  final int? displacement;
+  final int? power;
+
+  const Engine({
     this.id,
     required this.generationId,
     required this.name,
@@ -119,25 +122,26 @@ class Engine {
 
   factory Engine.fromMap(Map<String, dynamic> map) {
     return Engine(
-      id: map['id'],
-      generationId: map['generation_id'],
-      name: map['name'],
-      code: map['code'],
-      fuel: map['fuel'],
-      displacement: map['displacement'],
-      power: map['power'],
+      id: map['id'] as int?,
+      generationId: map['generation_id'] as int,
+      name: map['name'] as String,
+      code: map['code'] as String,
+      fuel: map['fuel'] as String,
+      displacement: map['displacement'] as int?,
+      power: map['power'] as int?,
     );
   }
 }
 
-class DtcCode {
-  int? id;
-  String code;
-  String description;
-  String causes;
-  String checks;
 
-  DtcCode({
+class DtcCode {
+  final int? id;
+  final String code;
+  final String description;
+  final String causes;
+  final String checks;
+
+  const DtcCode({
     this.id,
     required this.code,
     required this.description,
@@ -157,11 +161,11 @@ class DtcCode {
 
   factory DtcCode.fromMap(Map<String, dynamic> map) {
     return DtcCode(
-      id: map['id'],
-      code: map['code'],
-      description: map['description'],
-      causes: map['causes'],
-      checks: map['checks'],
+      id: map['id'] as int?,
+      code: map['code'] as String,
+      description: map['description'] as String,
+      causes: map['causes'] as String,
+      checks: map['checks'] as String,
     );
   }
 }
